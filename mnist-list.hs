@@ -20,8 +20,8 @@ type ParamSet = (W2, B2, W3, B3)
 
 -- constants
 trainDataPath,trainLabelPath,testDataPath,testLabelPath :: FilePath
-trainDataPath  = "/vagrant/train-images.idx3-ubyte"
-trainLabelPath = "/vagrant/train-labels.idx1-ubyte"
+trainDataPath  = "/vagrant/train-images.idx3-ubyte-shuffle"
+trainLabelPath = "/vagrant/train-labels.idx1-ubyte-shuffle"
 testDataPath   = undefined
 testLabelPath  = undefined
 
@@ -140,7 +140,7 @@ predict param ds = (sum . map accept) ds / fromIntegral bsize
 
 loss :: ParamSet -> DataSet -> R
 loss param ds = (sum . map cross_entropy) ds / fromIntegral bsize
-  where cross_entropy (img,lbl) = - (lbl <.> cmap log (scalar 1e-7 + softmax $ forward param img))
+  where cross_entropy (img,lbl) = - (lbl <.> cmap log (scalar 1e-7 + softmax (forward param img)))
 
 update :: ParamSet -> ParamSet -> ParamSet -> ParamSet
 update original gradient momentum = original `sumParam` gradient `sumParam` momentum
@@ -189,24 +189,20 @@ main = do
   gen0 <- newStdGen
 
   -- get dataset
-  ds <- take trainDataNum <$> toDataSet
+  ds <- toDataSet
+
+  -- split to mini batch
+  let mbs = slice2list bsize ds
 
   -- create mutables
   refp <- newIORef (w2, b2, w3, b3)
   refm <- newIORef (0.0, 0.0, 0.0, 0.0)
-  refg <- newIORef gen0
 
-  let loop = take trainNum [0..]
+  let loop = zip (take trainNum [0..]) mbs
 
-  forM_ loop $ \i -> do
+  forM_ loop $ \(i,mb) -> do
     p <- readIORef refp
     m <- readIORef refm
-    g <- readIORef refg
-
-    -- get random batch mask and mini batch
-    let (bmask, gen) = finiteRandomRs (0,trainDataNum-1) bsize g
-        mb = (ds!!) <$> bmask
-    writeIORef refg gen
 
     -- calculate gradient and momentum
     let gradient = (-ep / fromIntegral bsize) `mulParam` grad p mb

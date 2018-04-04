@@ -141,7 +141,7 @@ predict param ds = (V.sum . V.map accept) ds / fromIntegral bsize
 
 loss :: ParamSet -> DataSet -> R
 loss param ds = (V.sum . V.map cross_entropy) ds / fromIntegral bsize
-  where cross_entropy (img,lbl) = - (lbl <.> cmap log (scalar 1e-7 + softmax $ forward param img))
+  where cross_entropy (img,lbl) = - (lbl <.> cmap log (scalar 1e-7 + softmax (forward param img)))
 
 update :: ParamSet -> ParamSet -> ParamSet -> ParamSet
 update original gradient momentum = original `sumParam` gradient `sumParam` momentum
