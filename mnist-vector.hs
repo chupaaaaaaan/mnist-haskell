@@ -82,11 +82,11 @@ slice2list = slice id
 slice2vec :: Int -> [R] -> [Vector R]
 slice2vec = slice vector
 
-onehot :: (Eq a, Num a) => a -> a -> [a]
+onehot :: (Integral a) => a -> a -> [a]
 onehot m n = reverse $ oh m
   where
     oh 0 = []
-    oh x = (if n == x then 1 else 0) : oh (x - 1)
+    oh x = (if n == (x - 1) then 1 else 0) : oh (x - 1)
 
 toDoubleList :: B.ByteString -> [R]
 toDoubleList = map ((/255) . read . show . fromEnum) . B.unpack
