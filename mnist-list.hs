@@ -32,7 +32,7 @@ bsize :: Int -- mini batch size
 bsize = 100
 
 epochUnit :: Int
-epochUnit = ((trainDataNum + bsize -1) `div` bsize)
+epochUnit = (trainDataNum + bsize -1) `div` bsize
 
 trainEpoch :: Int
 trainEpoch = 16
@@ -91,15 +91,15 @@ toDoubleList :: B.ByteString -> [R]
 toDoubleList = map ((/255) . read . show . fromEnum) . B.unpack
 
 toOneHotList :: B.ByteString -> [R]
-toOneHotList = concat . map (map fromIntegral . onehot 10 . fromEnum) . B.unpack
+toOneHotList = concatMap (map fromIntegral . onehot 10 . fromEnum) . B.unpack
 
 
 -- utility for initializing weights
 initMatrix :: Int -> Int -> IO (Matrix R)
-initMatrix row col = ((scalar 0.01)*) <$> randn row col
+initMatrix row col = (scalar 0.01 *) <$> randn row col
 
 initVector :: Int -> IO (Vector R)
-initVector len = (((scalar 0.01)*) . flatten) <$> randn 1 len
+initVector len = ((scalar 0.01 *) . flatten) <$> randn 1 len
 
 
 -- elements of learning network
@@ -113,7 +113,7 @@ sigmoid :: R -> R
 sigmoid x = 1.0 / (1.0 + exp (-x))
 
 sigmoid' :: R -> R
-sigmoid' x = (sigmoid x) * (1.0 - sigmoid x)
+sigmoid' x = sigmoid x * (1.0 - sigmoid x)
 
 relu :: R -> R
 relu x
@@ -132,21 +132,21 @@ softmax v = expv / scalar w
         w    = sumElements expv
 
 forward :: ParamSet -> Vector R -> Vector R
-forward (w2,b2,w3,b3) input = w3 #> (cmap activate $ w2 #> input + b2) + b3
+forward (w2,b2,w3,b3) input = w3 #> cmap activate (w2 #> input + b2 + b3)
 
 predict :: ParamSet -> DataSet -> R
 predict param ds = (sum . map accept) ds / fromIntegral bsize
-  where accept (img,lbl) = if (maxIndex (forward param img) == maxIndex lbl) then 1.0 else 0.0
+  where accept (img,lbl) = if maxIndex (forward param img) == maxIndex lbl then 1.0 else 0.0
 
 loss :: ParamSet -> DataSet -> R
 loss param ds = (sum . map cross_entropy) ds / fromIntegral bsize
-  where cross_entropy (img,lbl) = - (lbl <.> cmap log (scalar 1e-7 + (softmax $ forward param img)))
+  where cross_entropy (img,lbl) = - (lbl <.> cmap log (scalar 1e-7 + softmax (forward param img)))
 
 update :: ParamSet -> ParamSet -> ParamSet -> ParamSet
 update original gradient momentum = original `sumParam` gradient `sumParam` momentum
 
 grad :: ParamSet -> DataSet -> ParamSet
-grad (w2,b2,w3,b3) = foldr sumParam acc . map getParamDiff
+grad (w2,b2,w3,b3) = foldr (sumParam . getParamDiff) acc
   where acc = (0.0,0.0,0.0,0.0)
         getParamDiff (img,lbl) =
           -- forward propagation
@@ -156,7 +156,7 @@ grad (w2,b2,w3,b3) = foldr sumParam acc . map getParamDiff
               z3 = softmax u3
           -- back propagation
               d3 = z3 - lbl
-              d2 = (cmap activate' u2) * (d3 <# w3)
+              d2 = cmap activate' u2 * (d3 <# w3)
               dw3 = d3 `outer` z2
               db3 = d3
               dw2 = d2 `outer` img
@@ -220,6 +220,6 @@ main = do
 
     p' <- readIORef refp
     -- when (i `mod` 100 == 0) $ do
-    print $ (i, predict p' mb, loss p' mb)
+    print (i, predict p' mb, loss p' mb)
 
   return ()
