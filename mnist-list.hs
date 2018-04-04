@@ -132,7 +132,7 @@ softmax v = expv / scalar w
         w    = sumElements expv
 
 forward :: ParamSet -> Vector R -> Vector R
-forward (w2,b2,w3,b3) input = w3 #> cmap activate (w2 #> input + b2 + b3)
+forward (w2,b2,w3,b3) input = w3 #> cmap activate (w2 #> input + b2) + b3
 
 predict :: ParamSet -> DataSet -> R
 predict param ds = (sum . map accept) ds / fromIntegral bsize
@@ -140,7 +140,7 @@ predict param ds = (sum . map accept) ds / fromIntegral bsize
 
 loss :: ParamSet -> DataSet -> R
 loss param ds = (sum . map cross_entropy) ds / fromIntegral bsize
-  where cross_entropy (img,lbl) = - (lbl <.> cmap log (scalar 1e-7 + softmax (forward param img)))
+  where cross_entropy (img,lbl) = - (lbl <.> cmap log (scalar 1e-7 + softmax $ forward param img))
 
 update :: ParamSet -> ParamSet -> ParamSet -> ParamSet
 update original gradient momentum = original `sumParam` gradient `sumParam` momentum
