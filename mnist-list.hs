@@ -1,11 +1,14 @@
 {-# LANGUAGE Strict, StrictData, GADTs #-}
 
 import Control.Monad
+import Control.Exception (bracket, finally)
 import Numeric.LinearAlgebra
 import qualified Data.ByteString.Lazy as B
-import Data.Binary (Word8, encode, decode)
+import Data.Binary
 import Data.IORef
+import System.IO
 import System.Random
+
 import Debug.Trace
 
 -- definition
@@ -24,6 +27,9 @@ trainDataPath  = "/vagrant/train-images.idx3-ubyte-shuffle"
 trainLabelPath = "/vagrant/train-labels.idx1-ubyte-shuffle"
 testDataPath   = undefined
 testLabelPath  = undefined
+
+filename :: FilePath
+filename = "error_and_accuracy.dat"
 
 trainDataNum :: Int
 trainDataNum = 60000
@@ -178,28 +184,32 @@ finiteRandomRs (x,y) n gen =
       (restOfList, finalGen) = finiteRandomRs (x,y) (n-1) newGen
   in (value:restOfList, finalGen)
 
+
+appendLine2File :: FilePath -> String -> IO ()
+appendLine2File filePath line = do
+  bracket
+    (openFile filePath AppendMode)
+    (\hdl -> hClose hdl)
+    (\hdl -> hPutStrLn hdl line)
+
 main :: IO ()
 main = do
+  -- initialize
   w2 <- initMatrix 50 imgSize
   b2 <- (scalar 0 *) <$> initVector 50
   w3 <- initMatrix 10 50
   b3 <- (scalar 0 *) <$> initVector 10
-
-  -- set seed of random number
-  gen0 <- newStdGen
+  refp <- newIORef (w2, b2, w3, b3)
+  refm <- newIORef (0.0, 0.0, 0.0, 0.0)
 
   -- get dataset
   ds <- toDataSet
 
   -- split to mini batch
   let mbs = slice2list bsize ds
+      loop = zip (take trainNum [0..]) mbs
 
-  -- create mutables
-  refp <- newIORef (w2, b2, w3, b3)
-  refm <- newIORef (0.0, 0.0, 0.0, 0.0)
-
-  let loop = zip (take trainNum [0..]) mbs
-
+  -- learning steps
   forM_ loop $ \(i,mb) -> do
     p <- readIORef refp
     m <- readIORef refm
@@ -214,8 +224,12 @@ main = do
     -- set next momentum
     writeIORef refm gradient
 
+    -- output parameters
     p' <- readIORef refp
-    -- when (i `mod` 100 == 0) $ do
-    print (i, predict p' mb, loss p' mb)
+    let dataline = show i ++ " " ++ show (predict p' mb) ++ " " ++ show (loss p' mb)
+    appendLine2File filename dataline
+    putStrLn dataline
+
+    -- when ((i+1) `mod` epochUnit == 0) $ do
 
   return ()
