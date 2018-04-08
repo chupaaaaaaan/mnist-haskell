@@ -1,5 +1,5 @@
--- {-# LANGUAGE Strict, StrictData, GADTs #-}
-{-# LANGUAGE GADTs #-}
+{-# LANGUAGE Strict, StrictData, GADTs #-}
+-- {-# LANGUAGE GADTs #-}
 
 import Control.Monad
 import Control.Exception
@@ -186,19 +186,21 @@ main = do
   -- variables
   refp <- newIORef (w2, b2, w3, b3)
   refm <- newIORef (0.0, 0.0, 0.0, 0.0)
-  -- refac_train <- newIORef 0
-  -- refac_test <- newIORef 0
+  refac_train <- newIORef 0
+  refac_test <- newIORef 0
 
   -- fetch dataset
   shuffles <- toDataSet Shuffle
-  -- trains <- toDataSet Train
-  -- tests <- toDataSet Test
+  trains <- toDataSet Train
+  tests <- toDataSet Test
 
   -- split to mini batch
   let mbs = slice2list bsize shuffles
       loop = zip (take trainNum [0..]) mbs
-      -- train_mbs = slice2list bsize trains
-      -- test_mbs = slice2list bsize trains
+      train_mbs = slice2list bsize trains
+      loop_train = zip (take trainNum [0..]) train_mbs
+      test_mbs = slice2list bsize tests
+      loop_test = zip (take trainNum [0..]) test_mbs
 
   -- learning steps
   forM_ loop $ \(i,mb) -> do
@@ -221,20 +223,32 @@ main = do
     appendFile "error.dat" dataline
     putStrLn dataline
 
-    -- -- output accuracy
+    -- output accuracy
     -- when ((i+1) `mod` epochUnit == 0) $ do
-    --   writeIORef refac_train 0
-    --   writeIORef refac_test 0
-    --   forM_ train_mbs $ \mb -> modifyIORef refac_train (+ accuracy_count p' mb)
-    --   forM_ test_mbs $ \mb -> modifyIORef refac_test (+ accuracy_count p' mb)
-    --   ac_train <- readIORef refac_train
-    --   ac_test <- readIORef refac_test
-    --   print ac_train
+    when (i == 0) $ do
+      writeIORef refac_train 0
+      writeIORef refac_test 0
 
-    --   let dataline = show ((i+1) `div` epochUnit) ++ " " ++
-    --                  show (ac_train / fromIntegral trainDataNum) ++ " " ++
-    --                  show (ac_test / fromIntegral testDataNum)
-    --   appendFile "accuracy.dat" dataline
-    --   putStrLn dataline
+      -- forM_ test_mbs $ \mb -> modifyIORef refac_test (+ accuracy_count p' mb)
+      forM_ loop_test $ \(i,mb) -> do
+        ac <- readIORef refac_test
+        putStrLn $ show i ++ " " ++ show ac
+        modifyIORef refac_test (+ accuracy_count p' mb)
+
+      -- forM_ train_mbs $ \mb -> modifyIORef refac_train (+ accuracy_count p' mb)
+      forM_ loop_train $ \(i,mb) -> do
+        ac <- readIORef refac_train
+        putStrLn $ show i ++ " " ++ show ac
+        modifyIORef refac_train (+ accuracy_count p' mb)
+
+      ac_train <- readIORef refac_train
+      ac_test <- readIORef refac_test
+      print ac_train
+
+      let dataline = show ((i+1) `div` epochUnit) ++ " " ++
+                     show (ac_train / fromIntegral trainDataNum) ++ " " ++
+                     show (ac_test / fromIntegral testDataNum)
+      appendFile "accuracy.dat" dataline
+      putStrLn dataline
 
   return ()
