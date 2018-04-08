@@ -9,6 +9,8 @@ import Data.IORef
 import System.IO
 import System.Random
 
+import Function
+
 import Debug.Trace
 
 -- definition
@@ -114,28 +116,6 @@ activate = relu
 
 activate' :: R -> R
 activate' = relu'
-
-sigmoid :: R -> R
-sigmoid x = 1.0 / (1.0 + exp (-x))
-
-sigmoid' :: R -> R
-sigmoid' x = sigmoid x * (1.0 - sigmoid x)
-
-relu :: R -> R
-relu x
-  | x > 0     = x
-  | otherwise = 0
-
-relu' :: R -> R
-relu' x
-  | x > 0     = 1
-  | otherwise = 0
-
-softmax :: Vector R -> Vector R
-softmax v = expv / scalar w
-  where v'   = maxElement v
-        expv = cmap exp (v - scalar v')
-        w    = sumElements expv
 
 forward :: ParamSet -> Vector R -> Vector R
 forward (w2,b2,w3,b3) input = w3 #> cmap activate (w2 #> input + b2) + b3
