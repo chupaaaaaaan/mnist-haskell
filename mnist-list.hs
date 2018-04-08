@@ -1,9 +1,10 @@
 {-# LANGUAGE Strict, StrictData, GADTs #-}
 
 import Control.Monad
-import Control.Exception (bracket, finally)
+import Control.Exception
 import Numeric.LinearAlgebra
 import qualified Data.ByteString.Lazy as B
+import Data.Maybe
 import Data.Binary
 import Data.IORef
 import System.IO
@@ -23,12 +24,15 @@ type W3 = Matrix R
 type B3 = Vector R
 type ParamSet = (W2, B2, W3, B3)
 
+data SType = Train | Shuffle | Test deriving (Eq)
+
 -- constants
-trainDataPath,trainLabelPath,testDataPath,testLabelPath :: FilePath
-trainDataPath  = "/vagrant/train-images.idx3-ubyte-shuffle"
-trainLabelPath = "/vagrant/train-labels.idx1-ubyte-shuffle"
-testDataPath   = undefined
-testLabelPath  = undefined
+dataSet :: [(SType,(FilePath,FilePath))]
+dataSet =
+  [(Shuffle, ("/vagrant/train-images.idx3-ubyte-shuffle", "/vagrant/train-labels.idx1-ubyte-shuffle"))
+  ,(Train,   ("/vagrant/train-images.idx3-ubyte",         "/vagrant/train-labels.idx1-ubyte"))
+  ,(Test,    ("/vagrant/t10k-images.idx3-ubyte",          "/vagrant/t10k-labels.idx1-ubyte"))
+  ]
 
 filename :: FilePath
 filename = "error_and_accuracy.dat"
@@ -59,10 +63,12 @@ mu = 0.9
 -- mu = 0.0
 
 -- utilities for loading data
-toDataSet :: IO DataSet
-toDataSet = do
-  imgData <- loadImg trainDataPath
-  lblData <- loadLbl trainLabelPath
+toDataSet :: SType -> IO DataSet
+toDataSet s = do
+  let imgpath = maybe "" fst . lookup s $ dataSet
+      lblpath = maybe "" snd . lookup s $ dataSet
+  imgData <- loadImg imgpath
+  lblData <- loadLbl lblpath
   return $ zip imgData lblData
 
 loadImg :: FilePath -> IO [Vector R]
@@ -164,14 +170,6 @@ finiteRandomRs (x,y) n gen =
       (restOfList, finalGen) = finiteRandomRs (x,y) (n-1) newGen
   in (value:restOfList, finalGen)
 
-
-appendLine2File :: FilePath -> String -> IO ()
-appendLine2File filePath line = do
-  bracket
-    (openFile filePath AppendMode)
-    (\hdl -> hClose hdl)
-    (\hdl -> hPutStrLn hdl line)
-
 main :: IO ()
 main = do
   -- initialize
@@ -183,7 +181,7 @@ main = do
   refm <- newIORef (0.0, 0.0, 0.0, 0.0)
 
   -- get dataset
-  ds <- toDataSet
+  ds <- toDataSet Shuffle
 
   -- split to mini batch
   let mbs = slice2list bsize ds
@@ -207,7 +205,7 @@ main = do
     -- output parameters
     p' <- readIORef refp
     let dataline = show i ++ " " ++ show (predict p' mb) ++ " " ++ show (loss p' mb)
-    appendLine2File filename dataline
+    appendFile filename dataline
     putStrLn dataline
 
     -- when ((i+1) `mod` epochUnit == 0) $ do
